@@ -1,9 +1,5 @@
-const { Pool } = require('pg'); 
-const process = require('process');
-const { text } = require('stream/consumers');
-const { release } = require('os');
-
-const pool = new Pool(config);
+const { Pool } = require("pg");
+const process = require("process");
 
 const argumentos = process.argv.slice(2);
 const argsInicial = argumentos[0];
@@ -12,128 +8,136 @@ const rut = argumentos[2];
 const curso = argumentos[3];
 const nivel = argumentos[4];
 
-const values = [nombre, rut, curso, nivel];
+const config = { //Realizar la conexión con PostgreSQL, utilizando la clase Pool y definiendo un máximo de 20 clientes, 5 segundos como tiempo máximo de inactividad de uncliente y 2 segundos de espera de un nuevo cliente.(2 Puntos)
+  user: "postgres",
+  host: "localhost",
+  database: "estudiantes",
+  password: "2619",
+  port: 5432,
+  max: 20,
+  idleTimeoutMillis: 5000,
+  connnectionTimeoutMillis: 2000,
+};
 
-const query = {
-    name: 'fetch-user',
-    text: "",
-    values: [],
+const pool = new Pool(config);
+
+async function ingresar(nombre, rut, curso, nivel) {
+  pool.connect(async (error_conexion, client, release) => {
+    if (error_conexion) return console.error(error_conexion.code);//Retornar por consola un mensaje de error en caso de haberproblemasdeconexión
+
+    const SQLQuery = {//Hacer todas las consultas con un JSON como argumento definiendo la propiedad name para el Prepared Statement.(2 Puntos)
+      name: "ingresar",
+      text: "insert into estudiantes (nombre, rut, curso, nivel) values ( $1 , $2, $3, $4 ) RETURNING *;",
+      values: [nombre, rut, curso, nivel],
+    };
+    try {
+      const res = await client.query(SQLQuery);
+      console.log(
+        `Ultimo Estudiante ${res.rows[0].nombre} agregado con éxito.`
+      );
+    } catch (error_consulta) {
+      console.log("! Error consulta !", error_consulta.code);//Capturar los posibles errores en todas las consultas
+    }
+
+    release();//Liberar a un cliente al concluir su consulta
+
+    pool.end();
+  });
 }
 
-// const generarQuery = (name, text, values) => {
-//     return { name, text, values }
-// }
+async function consultaRut(rut) {
+  pool.connect(async (error_conexion, client, release) => {
+    if (error_conexion) return console.log(error_conexion.code);//Retornar por consola un mensaje de error en caso de haberproblemasdeconexión
 
-const config = {
-    user: "postgres",
-    host: "localhost",
-    database: "estudiantes",
-    password: "2619",
-    port: 5432,
-    max: 20,
-    idleTimeoutMillis: 5000,
-    connnectionTimeoutMillis: 2000,
+    const SQLQuery = { //Hacer todas las consultas con un JSON como argumento definiendo la propiedad name para el Prepared Statement.(2 Puntos)
+      name: "consultaRut",
+      text: "SELECT * FROM estudiantes WHERE rut = $1", //Hacer las consultas con texto parametrizado.
+      values: [rut],
+    };
+    try {
+      const res = await client.query(SQLQuery);
+      console.log("Resgistro actual: ", res.rows[0]);//Obtener el registro de los estudiantes registrados en formato de arreglos
+    } catch (error_consulta) {
+      console.log("Error de conexion: ", error_consulta.code);//Capturar los posibles errores en todas las consultas
+    }
+    release();//Liberar a un cliente al concluir su consulta
+
+    pool.end();
+  });
 }
 
-const client = new Client(config);
-client.connect();
+async function consulta() {
+  pool.connect(async (error_conexion, client, release) => {
+    if (error_conexion) return console.log(error_conexion.code);//Retornar por consola un mensaje de error en caso de haberproblemasdeconexión
 
-async function ingresar(nombre, rut, curso, nivel) {   
+    const SQLQuery = {
+      rowMode: "array",
+      text: "SELECT * FROM estudiantes",//Hacer las consultas con texto parametrizado.
+    };
+    try {
+      const res = await client.query(SQLQuery);
+      console.log("Registro actual:", res.rows);//Obtener el registro de los estudiantes registrados en formato de arreglos
+    } catch (error_consulta) {
+      console.log("Error de conexion: ", error_consulta.code);//Capturar los posibles errores en todas las consultas
+    }
+    release();//Liberar a un cliente al concluir su consulta
 
-    pool.connect(async(error_conexion, client, release) => {
-
-        if (error_conexion)
-        return console.error(error_conexion.code)
-
-        const SQLQuery = {
-            name: "Ingresar",
-            text: "insert into estudiantes (nombre, rut, curso, nivel) values ( $1 , $2, $3, $4 ) RETURNING *;",
-            values: [nombre, rut, curso, nivel],
-        }
-        try {
-            const res = await client.query(SQLQuery); 
-            console.log(`Ultimo Estudiante ${res.rows[0].nombre} agregado con éxito.`);  
-
-        } catch(error_consulta){
-            console.log("! Error consulta !", error_consulta.code)
-        }
-
-        release();
-        
-        pool.end();
-    });
+    pool.end();
+  });
 }
 
-if (metodo === 'nuevo') {
-    ingresar(nombre, rut, curso, nivel)
+async function editar(nombre, rut, curso, nivel) {
+  pool.connect(async (error_conexion, client, release) => {
+    if (error_conexion) return console.log(error_conexion.code);//Retornar por consola un mensaje de error en caso de haberproblemasdeconexión
 
-} else if (metodo === 'rut'){
-    consultaRut(nombre)   
+    const SQLQuery = {// Hacer todas las consultas con un JSON como argumento definiendo la propiedad name para el Prepared Statement.(2 Puntos)
+      name: "editar",
+      text: "UPDATE estudiantes SET nombre = $1, nivel = $3, curso = $4 WHERE rut = $2 RETURNING *",//Hacer las consultas con texto parametrizado.
+      values: [nombre, rut, curso, nivel],
+    };
+    try {
+      const res = await client.query(SQLQuery);
+      console.log(`Estudiante ${res.rows[0].nombre} editado con éxito`);//Obtener el registro de los estudiantes registrados en formato de arreglos
+    } catch (error_consulta) {
+      console.log("Error de conexion: ", error_consulta.code);//Capturar los posibles errores en todas las consultas
+    }
+    release();//Liberar a un cliente al concluir su consulta
 
-} else if (metodo === 'consulta'){
-    consulta()
-
-} else if (metodo === 'editar'){
-    editar(nombre, rut, curso, nivel)
-
-} else if (metodo === 'eliminar'){
-    eliminar(nombre)
+    pool.end();
+  });
 }
 
-async function consultaRut(rut) { 
+async function eliminar(rut) {
+  pool.connect(async (error_conexion, client, release) => {
+    if (error_conexion)
+      return console.log("Error de conexion: ", error_conexion.code);// Retornar por consola un mensaje de error en caso de haberproblemas de conexión
 
-    pool.connect(async(error_conexion, client, release) => {
+    const SQLQuery = {// Hacer todas las consultas con un JSON como argumento definiendo la propiedad name para el Prepared Statement.(2 Puntos)
+      name: "eliminar",
+      text: "DELETE FROM estudiantes WHERE rut = $1 RETURNING *",//Hacer las consultas con texto parametrizado.
+      values: [rut],
+    };
+    try {
+      const res = await client.query(SQLQuery);
+      console.log(
+        `Registro de estudiante con rut ${res.rows[0].rut} eliminado con éxito`);//Obtener el registro de los estudiantes registrados en formato de arreglos
+    } catch (error_consulta) {
+      console.log("Error de consulta: ", error_consulta.code);//Capturar los posibles errores en todas las consultas
+    }
+    release();//Liberar a un cliente al concluir su consulta
 
-        if(error_conexion)
-        return console.log(error_conexion.code);
-        const SQLQuery = {
-            name:"consultaRut",
-            text:'SELECT * FROM estudiantes WHERE rut = $1',
-            values: [rut],
-        };
-        try {
-            const res = await client.query(SQLQuery);
-            console.log('Resgistro actual: ', res.rows[0]);
-        } catch (error_consulta) {
-            console.log("Error de conexion: ", error_consulta.code);
-        }
-        release();
-
-        pool.end();
-    })
-    
-    console.log(rutEstudiante);
-    const res = await client.query(`SELECT * FROM estudiantes WHERE rut='${rutEstudiante}'`)
-    console.log("Registros: ", res.rows);
-    client.end()
+    pool.end();
+  });
 }
 
-async function consulta(){ // 4. Crear una función asíncrona para obtener por consola todos los estudiantes registrados.(1 Punto)
-     const res = await client.query("SELECT * FROM estudiantes")
-     console.log("Registros: ", res.rows)
-     client.end()
+if (argsInicial === "ingresar") {
+  ingresar(nombre, rut, curso, nivel);
+} else if (argsInicial === "consultaRut") {
+  consultaRut(nombre);
+} else if (argsInicial === "consulta") {
+  consulta();
+} else if (argsInicial === "editar") {
+  editar(nombre, rut, curso, nivel);
+} else if (argsInicial === "eliminar") {
+  eliminar(nombre);
 }
- 
-async function editar(){ // 5. Crear una función asíncrona para actualizar los datos de un estudiante en la base de datos.(2 Puntos)
-    const res = await client.query(
-        `UPDATE estudiantes SET nombre='${nombre}',rut='${rut}',curso='${curso}',nivel=${nivel} WHERE rut='${rut}' RETURNING *`
-    )
-    console.log("Registro modificado:", res.rows[0])
-    console.log("Cantidad de registros afectados", res.rowCount)
-    client.end()
-}
- 
-async function eliminar() { // 6. Crear una función asíncrona para eliminar el registrodeunestudiantedelabasede datos.(2 Puntos)
-    const res = await client.query(
-        `DELETE FROM estudiantes WHERE rut='${rut}' RETURNING *`
-    )
-    console.log("Cantidad de registros afectados: ", res.rowCount)
-    client.end()
-}
-
-
-
-
-
-
-
